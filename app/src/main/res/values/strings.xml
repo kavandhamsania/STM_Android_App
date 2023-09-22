@@ -36,4 +36,6 @@
     <string name="long_range_coded_phy_supported">Long Range (Coded PHY) Supported:</string>
     <string name="extended_advertising_supported">Extended Advertising Supported:</string>
     <string name="periodic_advertising_supported">Periodic Advertising Supported:</string>
+    <string name="Reset">Reset</string>
+    <string name="Address">Address</string>
 </resources>

@@ -33,9 +33,7 @@ import com.stm.bledemo.BLEApplication
 val SERVICE_UUID = "D973F2E0-B19E-11E2-9E96-0800200C9A66"
 val WRITE_CHARACTERISTIC_UUID = "D973F2E2-B19E-11E2-9E96-0800200C9A66"
 val YOUR_NOTIFY_CHARACTERISTIC_UUID = "D973F2E1-B19E-11E2-9E96-0800200C9A66"
-val ACKNOWLEDGMENT_FLAG = 0x01.toByte()
-val acknowledgmentMutex = Mutex()
-var isWaitingForAcknowledgment = false
+var EXT_ADDRESS =0x0
 
 @SuppressLint("NotifyDataSetChanged")
 class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ViewHolder>() {
@@ -63,35 +61,65 @@ class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ViewHolder>() {
                 // Write Button Clicked (Accepts Hex Message, Sends Byte Array)
                 writeButton.setOnClickListener {
                     BLEManager.scope.launch {
-                        if (writeEditText.text.isNotEmpty()) {
+                 //       if (writeEditText.text.isNotEmpty()) {
+
                             val item = items[bindingAdapterPosition]
                             val byteMessage = writeEditText.text.toString().removeWhiteSpace().hexToByteArray()
                             val service = BLEManager.bGatt?.getService(UUID.fromString("D973F2E0-B19E-11E2-9E96-0800200C9A66"))
+                            val read_characteristic= service!!.getCharacteristic(UUID.fromString("D973F2E1-B19E-11E2-9E96-0800200C9A66"))
                             val characteristic1 = service!!.getCharacteristic(UUID.fromString("D973F2E2-B19E-11E2-9E96-0800200C9A66"))
                         //    BLEManager.writeCharacteristic(item.characteristic, byteMessage)
-                            val byteArray = readBinaryData(BLEApplication.app,"finite_state2.bin",characteristic1)
+                            /*Enable Notification*/
+                            BLEManager.enableNotifications(read_characteristic)
+                            val byteArray = readBinaryData(BLEApplication.app,"finite_state.bin",characteristic1)
                             if (byteArray != null) {
-                            val Meta_Data_Frame= MetaInfo( FIRMWARE_UPDATE, EXT_FW_START_ADDRESS,byteArray.size.toUInt(),0u)
-                            val Header_Frame = ETXOTAHeader.headerdataframe(ETXOTAPacketType.ETX_OTA_PACKET_TYPE_HEADER,
-                                0x0Du,Meta_Data_Frame,0u).HeaderByteArray()
-                            val dataList= listOf(Start_Frame,Header_Frame)
-                            val enddata= listOf(Stop_Frame)
-                            val coroutineScope = CoroutineScope(Dispatchers.Main)
-                            coroutineScope.launch {
+                                val metadata= MetaInfo( FIRMWARE_UPDATE,
+                                    EXT_ADDRESS.toUInt(),byteArray.size.toUInt(),0u)
+                                val head = ETXOTAHeader.headerdataframe(ETXOTAPacketType.ETX_OTA_PACKET_TYPE_HEADER,
+                                0x0Du,metadata,0u).HeaderByteArray()
+                                val dataList= listOf(Start_Frame,head)
+                                val header_data=listOf(head)
+                                val enddata= listOf(Stop_Frame)
+                                val coroutineScope = CoroutineScope(Dispatchers.Main)
+                                coroutineScope.launch {
                                   BLEManager.startDataTransmission(dataList)
                                   BLEManager.sendotadata(byteArray)
                                   BLEManager.startDataTransmission(enddata)
 
                                 }
                             }
-                        }
-
-
+              //          }
 
                         writeEditText.setText("")
                     }
                 }
+/********RESET*********
+                ResetButton.setOnClickListener{
+                    BLEManager.scope.launch {
 
+                        val service = BLEManager.bGatt?.getService(UUID.fromString("D973F2E0-B19E-11E2-9E96-0800200C9A66"))
+                        val read_characteristic= service!!.getCharacteristic(UUID.fromString("D973F2E1-B19E-11E2-9E96-0800200C9A66"))
+                        val characteristic = service!!.getCharacteristic(UUID.fromString("D973F2E2-B19E-11E2-9E96-0800200C9A66"))
+                        val coroutineScope = CoroutineScope(Dispatchers.Main)
+                        coroutineScope.launch {
+
+                            val dataList= listOf(byteArrayOf(0xFF.toByte()))
+                            BLEManager.startDataTransmission(dataList)
+                            BLEManager.disableNotifications(read_characteristic)
+                        }
+                    }
+                }
+**/
+                AddressButton.setOnClickListener {
+                    BLEManager.scope.launch {
+                              if (Address.text.isNotEmpty()) {
+
+                                  EXT_ADDRESS = Address.text.toString().removeWhiteSpace().toInt()
+                                  Address.setText("")
+                              }
+
+                    }
+                }
                 // Notify Switch Toggled
                 notifySwitch.setOnCheckedChangeListener { _, isChecked ->
                     BLEManager.scope.launch {
@@ -120,7 +148,7 @@ class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ViewHolder>() {
         )
         return ViewHolder(binding)
     }
-
+/****To Add the view of Layout According to  Service and Characteristics ****/
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
 
@@ -134,6 +162,12 @@ class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ViewHolder>() {
             readLayout.isGone = !item.readable
             writeLayout.isGone = !(item.writable || item.writableNoResponse)
             notifyLayout.isGone = !(item.notifiable || item.indicatable)
+            /*If Write layout is not available then Address layout is not viewable*/
+            if( writeLayout.isGone)
+            {
+                AddressLayout.isGone=true
+            }
+
 
             if (item.type == "Characteristic") {
                 itemUUID.text = item.characteristic?.uuid
